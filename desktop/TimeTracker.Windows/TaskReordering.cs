@@ -145,4 +145,24 @@ public partial class MainWindow
         var index = (row.IsPlan ? Plans : Tasks).IndexOf(row.Task);
         if (Reorder(list, row, e.SystemKey == Key.Up ? index - 1 : index + 2)) list.ScrollIntoView(list.SelectedItem);
     }
+
+    private void SortTodayByProject(object sender, RoutedEventArgs e) => SortByProject(false);
+    private void SortNextByProject(object sender, RoutedEventArgs e) => SortByProject(true);
+
+    private void SortByProject(bool plan) => RunAction(() =>
+    {
+        if (!ConfirmInlineEdit()) return;
+        var list = plan ? Plans : Tasks;
+        if (list.Count < 2) { SetStatus("並べ替える予定が2件以上ありません。"); return; }
+        if (!TaskOrdering.SortByProject(list)) { SetStatus("既にプロジェクト順に並んでいます。"); return; }
+        if (plan && engine.Document.Days.TryGetValue(engine.Document.SelectedDate.AddDays(1), out var nextDayTasks) && nextDayTasks.Count > 1)
+            TaskOrdering.SortByProject(nextDayTasks);
+        var box = plan ? NextList : TodayList;
+        var scroll = Descendant<ScrollViewer>(box);
+        var offset = scroll?.VerticalOffset ?? 0;
+        Save(); Rebuild();
+        box.UpdateLayout();
+        scroll?.ScrollToVerticalOffset(offset);
+        SetStatus($"{(plan ? "次日の予定" : "本日の予定")}をプロジェクト順に並べ替えました。");
+    });
 }

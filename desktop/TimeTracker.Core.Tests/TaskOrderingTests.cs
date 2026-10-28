@@ -30,4 +30,28 @@ public class TaskOrderingTests
         Assert.False(TaskOrdering.Move(tasks, new WorkTask(), 0));
         Assert.Single(tasks);
     }
+
+    [Fact]
+    public void SortByProjectGroupsProjectsPlacesDefaultLastAndPreservesRelativeTaskOrder()
+    {
+        var tasks = new List<WorkTask>
+        {
+            new() { Id = "1", Project = "その他", Name = "雑務1", PlannedHours = 0.5, ActualSeconds = 10 },
+            new() { Id = "2", Project = "Project B", Name = "B-1", PlannedHours = 1.5, ActualSeconds = 20 },
+            new() { Id = "3", Project = "Project A", Name = "A-1", PlannedHours = 2.0, ActualSeconds = 30 },
+            new() { Id = "4", Project = "Project B", Name = "B-2", PlannedHours = 0.5, ActualSeconds = 40 },
+            new() { Id = "5", Project = "その他", Name = "雑務2", PlannedHours = 1.0, ActualSeconds = 50 },
+            new() { Id = "6", Project = "Project A", Name = "A-2", PlannedHours = 1.0, ActualSeconds = 60 }
+        };
+        Assert.True(TaskOrdering.SortByProject(tasks));
+        Assert.Equal(new[] { "3", "6", "2", "4", "1", "5" }, tasks.Select(t => t.Id));
+        Assert.False(TaskOrdering.SortByProject(tasks));
+    }
+
+    [Fact]
+    public void SortByProjectReturnsFalseForSingleOrEmptyList()
+    {
+        Assert.False(TaskOrdering.SortByProject([]));
+        Assert.False(TaskOrdering.SortByProject([new WorkTask { Project = "A", Name = "1" }]));
+    }
 }
