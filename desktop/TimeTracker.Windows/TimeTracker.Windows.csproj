@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>TimeTrackerReport</AssemblyName>
+    <VersionPrefix>1.1.0</VersionPrefix>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../TimeTracker.Core/TimeTracker.Core.csproj" /></ItemGroup>
+  <ItemGroup><Using Include="System" /><Using Include="System.Collections.Generic" /><Using Include="System.IO" /><Using Include="System.Linq" /><Using Include="System.Threading.Tasks" /></ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets/app.ico" />
+    <Content Include="../../docs/USER-GUIDE.md" Link="docs/USER-GUIDE.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../DailyReportFormat.txt" Link="DailyReportFormat.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

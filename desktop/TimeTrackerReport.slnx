@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="TimeTracker.Core/TimeTracker.Core.csproj" />
+  <Project Path="TimeTracker.Windows/TimeTracker.Windows.csproj" />
+  <Project Path="TimeTracker.Core.Tests/TimeTracker.Core.Tests.csproj" />
+</Solution>
