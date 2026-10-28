@@ -66,6 +66,15 @@ public sealed class TrackerEngine
         if (date == default || date == DateOnly.MaxValue) throw new InvalidDataException("日付が範囲外です。");
         Pause();
         Document.SelectedDate = date;
+        CarryPlannedTasks(date);
+    }
+
+    public bool CarryPlannedTasks(DateOnly date)
+    {
+        if (!Document.Plans.TryGetValue(date, out var planned) || planned.Count == 0) return false;
+        if (Document.Days.TryGetValue(date, out var existing) && existing.Count > 0) return false;
+        Document.Tasks(date).AddRange(planned.Select(task => task.AsPlan()));
+        return true;
     }
 
     public void SetActual(WorkTask task, double seconds)

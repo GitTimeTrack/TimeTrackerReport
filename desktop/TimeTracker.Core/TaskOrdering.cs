@@ -13,4 +13,24 @@ public static class TaskOrdering
         tasks.Insert(destination, task);
         return true;
     }
+
+    public static bool SortByProject(List<WorkTask> tasks)
+    {
+        if (tasks.Count < 2) return false;
+        var sorted = tasks
+            .Select((task, index) => (Task: task, Index: index))
+            .OrderBy(item => IsDefaultProject(item.Task.Project) ? 1 : 0)
+            .ThenBy(item => item.Task.Project.Trim(), StringComparer.CurrentCulture)
+            .ThenBy(item => item.Task.Project.Trim(), StringComparer.Ordinal)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Task)
+            .ToList();
+        if (tasks.SequenceEqual(sorted)) return false;
+        tasks.Clear();
+        tasks.AddRange(sorted);
+        return true;
+    }
+
+    private static bool IsDefaultProject(string? project) =>
+        string.IsNullOrWhiteSpace(project) || project.Trim() == "その他";
 }

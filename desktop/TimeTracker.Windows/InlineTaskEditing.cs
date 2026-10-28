@@ -69,23 +69,77 @@ public partial class MainWindow
             return;
         }
         previousSchedule = ScheduleTabs.SelectedIndex;
+        if (CopyPreviousButton is not null)
+        {
+            var isNextTab = ScheduleTabs.SelectedIndex == 1;
+            CopyPreviousButton.Content = isNextTab ? "本日の予定から追加" : "前日の作業から追加";
+            CopyPreviousButton.Tag = isNextTab ? "TodayToNext" : "Previous";
+        }
     }
     private void CopyTasks(object sender, RoutedEventArgs e) => RunAction(() =>
     {
         if (!ConfirmInlineEdit()) return;
-        var previous = ((Button)sender).Tag as string == "Previous";
-        var plan = !previous && ScheduleTabs.SelectedIndex == 1;
-        var sourceDay = previous ? engine.Document.SelectedDate.AddDays(-1) : plan ? engine.Document.SelectedDate.AddDays(1) : engine.Document.SelectedDate;
-        var source = previous ? engine.Document.Days.GetValueOrDefault(sourceDay) ?? [] : plan ? Plans : Tasks;
+        var tag = ((Button)sender).Tag as string;
+        string sourceMode;
+        DateOnly sourceDay;
+        List<WorkTask> source;
+        DateOnly targetDate;
+        bool isPlan;
+        if (tag == "Previous")
+        {
+            sourceMode = "Previous";
+            sourceDay = engine.Document.SelectedDate.AddDays(-1);
+            source = engine.Document.Days.GetValueOrDefault(sourceDay) ?? [];
+            targetDate = engine.Document.SelectedDate;
+            isPlan = false;
+        }
+        else if (tag == "TodayToNext")
+        {
+            sourceMode = "Today";
+            sourceDay = engine.Document.SelectedDate;
+            source = Tasks;
+            targetDate = engine.Document.SelectedDate.AddDays(1);
+            isPlan = true;
+        }
+        else if (ScheduleTabs.SelectedIndex == 1 && Plans.Count > 0)
+        {
+            sourceMode = "Next";
+            sourceDay = engine.Document.SelectedDate.AddDays(1);
+            source = Plans;
+            targetDate = engine.Document.SelectedDate.AddDays(1);
+            isPlan = true;
+        }
+        else
+        {
+            sourceMode = "Today";
+            sourceDay = engine.Document.SelectedDate;
+            source = Tasks;
+            targetDate = engine.Document.SelectedDate.AddDays(1);
+            isPlan = true;
+        }
         if (source.Count == 0) { SetStatus("複製する作業・予定がありません。"); return; }
         editing = true;
         try
         {
-            var dialog = new TaskCopyWindow(this, source, $"{sourceDay:yyyy/MM/dd}の{(plan ? "予定" : "作業")}から選択", plan ? engine.Document.SelectedDate.AddDays(1) : engine.Document.SelectedDate, plan);
+            var label = sourceMode switch
+            {
+                "Previous" => $"{sourceDay:yyyy/MM/dd}（前日の作業）から選択",
+                "Next" => $"{sourceDay:yyyy/MM/dd}（次日の予定）から選択",
+                _ => $"{sourceDay:yyyy/MM/dd}（本日の予定）から選択"
+            };
+            var dialog = new TaskCopyWindow(this, source, label, targetDate, isPlan, engine.Document, sourceMode);
             if (dialog.ShowDialog() != true) return;
             var count = TaskCopying.CopyTo(engine.Document, dialog.SelectedTasks, dialog.TargetDate, dialog.TargetIsPlan, dialog.CopyNotes);
             var saved = Save(); Rebuild();
-            if (saved) SetStatus($"{dialog.TargetDate:yyyy/MM/dd} の{(dialog.TargetIsPlan ? "予定" : "作業")}へ{count}件追加しました。");
+            if (saved)
+            {
+                var targetName = dialog.TargetDate == engine.Document.SelectedDate
+                    ? $"{dialog.TargetDate:yyyy/MM/dd}（本日の予定）"
+                    : dialog.TargetDate == engine.Document.SelectedDate.AddDays(1)
+                        ? $"{dialog.TargetDate:yyyy/MM/dd}（次日の予定）"
+                        : $"{dialog.TargetDate:yyyy/MM/dd} の{(dialog.TargetIsPlan ? "予定" : "作業")}";
+                SetStatus($"{targetName}へ{count}件追加しました。");
+            }
         }
         finally { editing = false; }
     });

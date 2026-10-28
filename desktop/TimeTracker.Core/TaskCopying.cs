@@ -16,6 +16,8 @@ public static class TaskCopying
         validation.Days[destination] = copies;
         DocumentValidation.Validate(validation);
         (isPlan ? document.Planned(destination) : document.Tasks(destination)).AddRange(copies);
+        if (isPlan && document.Days.TryGetValue(destination, out var existingDayTasks) && existingDayTasks.Count > 0)
+            existingDayTasks.AddRange(copies.Select(task => task.AsPlan()));
         return copies.Count;
     }
 }

@@ -160,8 +160,21 @@ public partial class MainWindow : Window
             engine.Tick();
             if (observedToday != engine.Today)
             {
+                var previousToday = observedToday;
                 observedToday = engine.Today;
-                Notify("日付が変わりました", "前日の計測を終了しました。「今日」へ移動して予定を引き継げます。");
+                if (engine.Document.SelectedDate == previousToday && !editing && inlineRow is null && absence is null)
+                {
+                    engine.SelectDate(engine.Today);
+                    changingDate = true;
+                    DayPicker.SelectedDate = engine.Today.ToDateTime(TimeOnly.MinValue);
+                    changingDate = false;
+                    selectedId = null;
+                    Notify("日付が変わりました", "前日の計測を終了し、本日の予定を引き継ぎました。");
+                }
+                else
+                {
+                    Notify("日付が変わりました", "前日の計測を終了しました。「今日」へ移動して予定を引き継げます。");
+                }
                 Save(); Rebuild();
             }
             var idle = NativeMethods.IdleTime();
@@ -298,7 +311,14 @@ public partial class MainWindow : Window
         try
         {
             var editor = new TaskEditor(this, null, plan);
-            if (editor.ShowDialog() == true) { (plan ? Plans : Tasks).Add(editor.Result); if (!plan) selectedId = editor.Result.Id; Save(); Rebuild(); }
+            if (editor.ShowDialog() == true)
+            {
+                (plan ? Plans : Tasks).Add(editor.Result);
+                if (plan && engine.Document.Days.TryGetValue(engine.Document.SelectedDate.AddDays(1), out var nextDayTasks) && nextDayTasks.Count > 0)
+                    nextDayTasks.Add(editor.Result.AsPlan());
+                if (!plan) selectedId = editor.Result.Id;
+                Save(); Rebuild();
+            }
         }
         finally { editing = false; }
     });
@@ -480,7 +500,10 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
         var parsed = TemplateParser.Parse(File.ReadAllText(dialog.FileName));
         if (MessageBox.Show(this, $"本日{parsed.Today.Count}件、次日{parsed.Next.Count}件を追加しますか？既存タスクは残ります。", "テンプレート", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-        Tasks.AddRange(parsed.Today); Plans.AddRange(parsed.Next); Save(); Rebuild();
+        Tasks.AddRange(parsed.Today); Plans.AddRange(parsed.Next);
+        if (parsed.Next.Count > 0 && engine.Document.Days.TryGetValue(engine.Document.SelectedDate.AddDays(1), out var nextDayTasks) && nextDayTasks.Count > 0)
+            nextDayTasks.AddRange(parsed.Next.Select(task => task.AsPlan()));
+        Save(); Rebuild();
     });
     private void OpenDataFolder(object sender, RoutedEventArgs e) => RunAction(() => Process.Start(new ProcessStartInfo("explorer.exe", App.DataDirectory) { UseShellExecute = true }));
     private void OpenMini(object sender, RoutedEventArgs e) => ShowMini();

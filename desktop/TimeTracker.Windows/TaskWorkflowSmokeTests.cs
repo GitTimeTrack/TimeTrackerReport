@@ -59,12 +59,19 @@ public partial class MainWindow
         if (plan.Task.PlannedHours != .5 || plan.Task.Notes != "次日の\nメモ") throw new InvalidOperationException("Next-day inline edit failed.");
         var sourceSnapshot = System.Text.Json.JsonSerializer.Serialize(Plans);
         var target = engine.Document.SelectedDate.AddDays(3);
-        var dialog = new TaskCopyWindow(this, Plans, "予定から選択", target, true);
+        var dialog = new TaskCopyWindow(this, Plans, "予定から選択", target, true, engine.Document, "Next");
         dialog.Show(); dialog.UpdateLayout();
+        if (dialog.FindName("DestinationKind") is not null)
+            throw new InvalidOperationException("Redundant work/plan dropdown must not exist.");
         if (dialog.PrepareSelection(out _)) throw new InvalidOperationException("Copy accepted an empty selection.");
+        dialog.ApplySourceMode("Today", setDefaultDestination: true);
+        if (dialog.Choices.Count != Tasks.Count)
+            throw new InvalidOperationException("Copy dialog did not switch source to today's tasks.");
+        dialog.ApplySourceMode("Next", setDefaultDestination: false);
+        dialog.DestinationDate.SelectedDate = target.ToDateTime(TimeOnly.MinValue);
         dialog.Choices[0].IsSelected = true;
         ((CheckBox)dialog.FindName("IncludeNotes")).IsChecked = false;
-        if (!dialog.PrepareSelection(out var summary) || !summary.Contains("1件", StringComparison.Ordinal))
+        if (!dialog.PrepareSelection(out var summary) || !summary.Contains("1件", StringComparison.Ordinal) || !dialog.TargetIsPlan)
             throw new InvalidOperationException("Copy selection or confirmation summary is invalid.");
         var count = TaskCopying.CopyTo(engine.Document, dialog.SelectedTasks, dialog.TargetDate, dialog.TargetIsPlan, dialog.CopyNotes);
         dialog.Close();
@@ -75,6 +82,30 @@ public partial class MainWindow
             throw new InvalidOperationException("Copy did not apply zero actual, new ID, and note options.");
         if (!Save() || store.Load()!.Planned(target).Single().Id != copy.Id)
             throw new InvalidOperationException("Copied plan was not saved.");
-        Rebuild(); ScheduleTabs.SelectedIndex = 0; UpdateLayout();
+        var originalDate = engine.Document.SelectedDate;
+        DayPicker.SelectedDate = target.ToDateTime(TimeOnly.MinValue); UpdateLayout();
+        if (Tasks.Count != 1 || Tasks[0].Name != copy.Name || Tasks[0].PlannedHours != copy.PlannedHours)
+            throw new InvalidOperationException("Next-day plan was not automatically carried over to today's tasks.");
+        DayPicker.SelectedDate = originalDate.ToDateTime(TimeOnly.MinValue); UpdateLayout();
+        var todayExtra1 = new WorkTask { Project = "その他", Name = "末尾プロジェクト", PlannedHours = 0.5 };
+        var todayExtra2 = new WorkTask { Project = "00_最優先", Name = "先頭プロジェクト", PlannedHours = 1.0 };
+        Tasks.Add(todayExtra1); Tasks.Add(todayExtra2);
+        Rebuild(); UpdateLayout();
+        SortTodayButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); UpdateLayout();
+        if (Tasks[0].Project != "00_最優先" || Tasks[^1].Project != "その他")
+            throw new InvalidOperationException("Project sort on today's tasks failed.");
+        ScheduleTabs.SelectedIndex = 1; UpdateLayout();
+        if ((string)CopyPreviousButton.Content != "本日の予定から追加" || !CopyFromTodayButton.IsVisible || !SortNextButton.IsVisible)
+            throw new InvalidOperationException("Next-day tab copy/sort actions are missing.");
+        var nextExtra1 = new WorkTask { Project = "その他", Name = "次日末尾", PlannedHours = 0.5 };
+        var nextExtra2 = new WorkTask { Project = "00_次日先頭", Name = "次日先頭", PlannedHours = 1.0 };
+        Plans.Add(nextExtra1); Plans.Add(nextExtra2);
+        Rebuild(); UpdateLayout();
+        SortNextButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); UpdateLayout();
+        if (Plans[0].Project != "00_次日先頭" || Plans[^1].Project != "その他")
+            throw new InvalidOperationException("Project sort on next-day plans failed.");
+        Tasks.Remove(todayExtra1); Tasks.Remove(todayExtra2);
+        Plans.Remove(nextExtra1); Plans.Remove(nextExtra2);
+        Save(); Rebuild(); ScheduleTabs.SelectedIndex = 0; UpdateLayout();
     }
 }

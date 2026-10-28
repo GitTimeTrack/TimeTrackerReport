@@ -92,4 +92,45 @@ public class TaskWorkflowTests
         draft.Apply(Engine(doc), task, true);
         Assert.Equal(1, task.PlannedHours); Assert.Equal(12.345, task.ActualSeconds); Assert.Equal("保存後", task.Notes);
     }
+
+    [Fact]
+    public void SelectingNextDayAutomaticallyCarriesNextDayPlansIntoTodayTasksOnce()
+    {
+        var doc = new TrackerDocument { SelectedDate = Day };
+        doc.Planned(Day.AddDays(1)).AddRange([
+            new WorkTask { Id = "plan1", Project = "開発", Name = "設計レビュー", PlannedHours = 1.5, Notes = "メモ1" },
+            new WorkTask { Id = "plan2", Project = "運用", Name = "定例会", PlannedHours = 0.5, Notes = "メモ2" }
+        ]);
+        var engine = Engine(doc);
+        engine.SelectDate(Day.AddDays(1));
+        var carried = doc.Tasks(Day.AddDays(1));
+        Assert.Equal(2, carried.Count);
+        Assert.Equal(new[] { "設計レビュー", "定例会" }, carried.Select(t => t.Name));
+        Assert.Equal(new[] { "開発", "運用" }, carried.Select(t => t.Project));
+        Assert.Equal(new[] { 1.5, 0.5 }, carried.Select(t => t.PlannedHours));
+        Assert.Equal(new[] { "メモ1", "メモ2" }, carried.Select(t => t.Notes));
+        Assert.All(carried, t => Assert.Equal(0, t.ActualSeconds));
+        Assert.Equal(2, doc.Planned(Day.AddDays(1)).Count);
+        // Re-selecting the same date must not duplicate already-carried tasks.
+        engine.SelectDate(Day);
+        engine.SelectDate(Day.AddDays(1));
+        Assert.Equal(2, doc.Tasks(Day.AddDays(1)).Count);
+    }
+
+    [Fact]
+    public void CopyingToPlannedDateAlsoUpdatesInitializedDayTasks()
+    {
+        var doc = new TrackerDocument { SelectedDate = Day };
+        var engine = Engine(doc);
+        doc.Planned(Day.AddDays(1)).Add(new WorkTask { Id = "p1", Project = "A", Name = "先行予定", PlannedHours = 1 });
+        engine.SelectDate(Day.AddDays(1));
+        Assert.Single(doc.Tasks(Day.AddDays(1)));
+        engine.SelectDate(Day);
+        var added = new WorkTask { Id = "today1", Project = "B", Name = "本日の予定から追加", PlannedHours = 2, Notes = "引継ぎ" };
+        doc.Tasks(Day).Add(added);
+        Assert.Equal(1, TaskCopying.CopyTo(doc, [added], Day.AddDays(1), true, true));
+        Assert.Equal(2, doc.Planned(Day.AddDays(1)).Count);
+        Assert.Equal(2, doc.Tasks(Day.AddDays(1)).Count);
+        Assert.Equal("本日の予定から追加", doc.Tasks(Day.AddDays(1))[1].Name);
+    }
 }
